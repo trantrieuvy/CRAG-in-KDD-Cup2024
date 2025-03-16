@@ -1,6 +1,8 @@
 from typing import Any, Dict, List
 from models.mock_api.api import MockAPI
-from prompts.templates import *
+# from prompts.original_templates import *
+# from prompts.templates import *
+from prompts.templates_v2 import *
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda
@@ -16,7 +18,8 @@ class RAGModel:
     def initialize_models(self, chat_model, retriever, domain_router, dynamic_router, use_kg):
         assert domain_router is not None, "Domain Router model is required."
         self.use_kg = use_kg
-        SYSTEM_PROMPT = "You are a helpful assistant."
+        #SYSTEM_PROMPT = "You are a helpful assistant."
+        SYSTEM_PROMPT = "You are a helpful assistant. Consult the provided references to answer the user's question. If the references do not contain enough information, rely on your own knowledge only if you are certain of the answer. Otherwise, acknowledge any uncertainty."
         if use_kg:
             self.api = MockAPI(chat_model)
             self.domain2template = {
@@ -132,14 +135,14 @@ class RAGModel:
                 if "average" in queries[i]:
                     answer = "I don't know"
 
-            if "how many shares" in queries[i] or "legal tender" in queries[i] or "whick five" in queries[i] or "low and high" in queries[i]:
-                answer = "I don't know"
-            if "$0.01" in answer:
-                answer = "I don't know"
+            #if "how many shares" in queries[i] or "legal tender" in queries[i] or "whick five" in queries[i] or "low and high" in queries[i]:
+            #    answer = "I don't know"
+            #if "$0.01" in answer:
+            #    answer = "I don't know"
             
             answers.append(answer)
   
-        return answers
+        return responses
     
     def get_reference(self, retrieval_results):
         references = ""
@@ -179,15 +182,15 @@ class RAGModel:
         return messages
         
     def get_final_answer_content(self, text):
-        # 找到标志字符串的位置
+        # Find the position of the marker string
         marker = "## Final Answer"
         marker_index = text.find(marker)
         # print("mark:", marker_index)
         if marker_index == -1:
-            # 如果没有找到标志字符串，返回空字符串
+            # If the marker string is not found, return an empty string
             return "i don't know"
         
-        # 获取标志字符串后面的内容
+        # Get the content after the marker string
         content_start_index = marker_index + len(marker)
         final_answer_content = text[content_start_index:].strip()
         
