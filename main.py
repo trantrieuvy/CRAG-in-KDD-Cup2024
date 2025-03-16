@@ -8,8 +8,9 @@ from models.load_model import load_model, load_model_ollama
 from models.router.router import SequenceClassificationRouter
 from models.retrieve.retriever import Retriever, Retriever_Milvus
 from models.model import RAGModel
+from dotenv import load_dotenv
 
-BATCH_SIZE = 20
+BATCH_SIZE = 1
 
 def load_data_in_batches(dataset_path, batch_size):
     """
@@ -96,12 +97,17 @@ def generate_predictions(dataset_path, participant_model):
 
 if __name__ == "__main__":
     # Set the environment variable for the mock API
-    os.environ["CRAG_MOCK_API_URL"] = "http://localhost:8000"
+    load_dotenv()
+    os.environ["CRAG_MOCK_API_URL"] = "https://demo3.kbs.uni-hannover.de"
 
-    # Load the model
-    api_key = "<your-api-key>"
-    base_url = "<your-base-url>"
-    model_name = "gpt-4o"
+    # Load the model from Interweb
+    api_key = os.getenv("INTERWEB_APIKEY")
+    base_url = os.getenv("INTERWEB_APIBASE")
+    # api_key = "ollama"
+    # base_url = "http://gpunode04.kbs:11434/v1/"
+    model_name = "llama3.3:70b"
+    # model_name = "deepseek-r1:32b"
+
     chat_model = load_model(model_name=model_name, api_key=api_key, base_url=base_url, temperature=0)
     # chat_model = load_model_ollama(model_name=model_name, temperature=0)
 
@@ -117,31 +123,53 @@ if __name__ == "__main__":
     # retriever = Retriever_Milvus(10, 5, collection_name, uri, embedding_model_path, reranker_model_path, rerank=True)
 
     # Load the domain router
+    #model_path = "/home/dang.hung.do/models/Meta-Llama-3-8B-Instruct"
+    model_path_domain = "models/router/bge-m3/domain"
+    if os.path.exists(model_path_domain):
+        print(f"Model found at {model_path_domain}.")
+    else:
+        print(f"Model not found {model_path_domain}.")
+
     domain_router = SequenceClassificationRouter(
-        model_path="models/router/bge-m3/domain",
+        model_path=model_path_domain,
         classes=["finance", "music", "movie", "sports", "open"],
         device_map="auto",
+        #peft_path="/home/dang.hung.do/workspace/CRAG-in-KDD-Cup2024/models/router/domain",
+        #use_bits_and_bytes=True,
+        #use_peft=True,
     )
 
     # Load the dynamic router
     use_kg = True
     use_dynamic = True
+
     if use_dynamic:
         dynamic_router = SequenceClassificationRouter(
+            #model_path=model_path,
             model_path="models/router/bge-m3/dynamic",
             classes=['static', 'slow-changing', 'fast-changing', 'real-time'],
             device_map="auto",
+            #peft_path="/home/dang.hung.do/workspace/CRAG-in-KDD-Cup2024/models/router/dynamic",
+            #use_bits_and_bytes=True,
+            #use_peft=True
         )
     # Initialize the RAG model
         rag_model = RAGModel(chat_model, retriever, domain_router, dynamic_router, use_kg=use_kg)
     else:
         rag_model = RAGModel(chat_model, retriever, domain_router, use_kg=use_kg)
     # Generate predictions
-    dataset_path = "example_data/dev_data.jsonl.bz2"
+    # dataset_path = "example_data/dev_data.jsonl.bz2"
+    # dataset_path = "example_data/crag_task_1_dev_v4_release.jsonl"
+    # dataset_path = "example_data/music.jsonl"
+    # dataset_path = "example_data/sports.jsonl"
+    dataset_path = "example_data/movie.jsonl"
+
     queries, ground_truths, predictions = generate_predictions(dataset_path, rag_model)
     
     # Save the predictions
-    output_path = f"results/{model_name}_predictions.jsonl"
+    if ":" in model_name:
+        model_name = model_name.replace(":", "_")
+    output_path = f"results/{model_name}_predictions_task2_movie.jsonl"
     with open(output_path, "w") as file:
         for query, ground_truth, prediction in zip(queries, ground_truths, predictions):
             item = {"query": query, "ground_truth": ground_truth, "prediction": prediction}
