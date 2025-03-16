@@ -5,6 +5,8 @@ import json
 from loguru import logger
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+import os
+from dotenv import load_dotenv
 
 BATCH_SIZE = 50
 
@@ -44,7 +46,8 @@ def evaluate_predictions(queries, ground_truths, predictions, evaluation_model):
         predictions, total=len(predictions), desc="Evaluating Predictions"
     )):
         query = queries[_idx]
-        ground_truth = ground_truths[_idx].strip()
+        # ground_truth = ground_truths[_idx].strip()
+        ground_truth = str(ground_truths[_idx]).strip()
         prediction = prediction.strip()
         
         ground_truth_lowercase = ground_truth.lower()
@@ -84,19 +87,37 @@ def evaluate_predictions(queries, ground_truths, predictions, evaluation_model):
     return results
 
 if __name__ == "__main__":
-    # Load the model
-    api_key = "<your-api-key>"
-    base_url = "<your-api-base>"
-    evaluation_model = load_model(model_name="gpt-4-turbo", api_key=api_key, base_url=base_url, temperature=0)
+    load_dotenv()
+    os.environ["CRAG_MOCK_API_URL"] = "https://demo3.kbs.uni-hannover.de"
+    
+    # Interweb models
+    api_key = os.getenv("INTERWEB_APIKEY")
+    # api_key = "ollama"
+    base_url = os.getenv("INTERWEB_APIBASE")
+    # base_url = "http://gpunode04.kbs:11434/v1/"
+
+    #evaluation_model_name = "gemma2:27b"
+    evaluation_model_name = "llama3.3:70b"
+    evaluation_model = load_model(model_name=evaluation_model_name, api_key=api_key, base_url=base_url, temperature=0)
 
     # Evaluate the predictions
-    model_name = "Llama3-70B"
-    predictions_path = f"results/{model_name}_predictions.jsonl"
-    with open(predictions_path, "r") as file:
-        predictions = [json.loads(line) for line in file]
+    model_name = "llama3.3:70b"
+    # predictions_path = f"results/{model_name}_predictions_new_prompts_task2.jsonl"
+    predictions_path_list = [
+        # "results/llama3.3_70b_predictions_task2_music.jsonl",
+        "results/llama3.3_70b_predictions_task2_sports.jsonl",
+        # "results/finance_predictions.jsonl",
+        # "results/movie_predictions.jsonl",
+        # "results/music_predictions.jsonl",
+        # "results/sports_predictions.jsonl",
+        # "results/open_predictions.jsonl",
+    ]
+    for predictions_path in predictions_path_list:
+        with open(predictions_path, "r") as file:
+            predictions = [json.loads(line) for line in file]
 
-    queries = [item["query"] for item in predictions]
-    ground_truths = [item["ground_truth"] for item in predictions]
-    predictions = [item["prediction"] for item in predictions]
+        queries = [item["query"] for item in predictions]
+        ground_truths = [item["ground_truth"] for item in predictions]
+        predictions = [item["prediction"] for item in predictions]
 
-    evaluate_predictions(queries, ground_truths, predictions, evaluation_model)
+        evaluate_predictions(queries, ground_truths, predictions, evaluation_model)
